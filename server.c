@@ -131,41 +131,13 @@ void *handle_client(void *arg)
 
     printf("New client connected: %d\n", client_fd);
 
+    char response[BUFFER_SIZE] = {0};
+    sprintf(response, "Connected to server");
+    send(client_fd, response, strlen(response), 0);
+
     while ((valread = read(client_fd, buffer, BUFFER_SIZE)) > 0)
     {
         printf("Client %d sent: %s\n", client_fd, buffer);
-
-        // TODO: handle client requests
-        if (strcmp(buffer, "DOWNLOAD") == 0)
-        {
-            char *filename = strtok(NULL, " "); // get the filename from the request
-            char filepath[PATH_MAX];
-            snprintf(filepath, PATH_MAX, "%s/%s", "server_files/", filename); // create the full file path
-            FILE *file = fopen(filepath, "rb");                          // open the file in binary mode
-            if (file == NULL)
-            {
-                // send an error message to the client if the file doesn't exist
-                char *error_msg = "ERROR File not found\r\n";
-                send(client_fd, error_msg, strlen(error_msg), 0);
-            }
-            else
-            {
-                // read the file and send its contents to the client
-                char buffer[BUFFER_SIZE];
-                size_t bytes_read;
-                while ((bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, file)) > 0)
-                {
-                    send(client_fd, buffer, bytes_read, 0);
-                }
-                fclose(file);
-            }
-        }
-
-        char response[BUFFER_SIZE] = {0};
-        visits++;
-        sprintf(response, "This server has been contacted %d time%s\n",
-                visits, visits == 1 ? "." : "s.");
-        send(client_fd, response, strlen(response), 0);
 
         memset(buffer, 0, BUFFER_SIZE);
     }

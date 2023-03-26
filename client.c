@@ -17,6 +17,14 @@
 #define MAX_LENGTH 1024 /* maximum buffer size */
 extern int errno;
 char localhost[] = "localhost"; /* default host name */
+
+
+void show_file_names();
+void upload_file();
+void download_file();
+void delete_file();
+void rename_file();
+
 /*------------------------------------------------------------------------
  * * Program: client
  * *
@@ -104,14 +112,14 @@ char *argv[];
         exit(1);
     }
 
-    // Send command to server
-    char command[MAX_LENGTH];
-    strcpy(command, argv[3]);
-    ssize_t request = send(sd, command, strlen(command), 0);
-    if (request < 0) {
-        fprintf(stderr, "error sending command\n");
-        exit(1);
-    }
+    // // Send command to server
+    // char command[MAX_LENGTH];
+    // strcpy(command, argv[3]);
+    // ssize_t request = send(sd, command, strlen(command), 0);
+    // if (request < 0) {
+    //     fprintf(stderr, "error sending command\n");
+    //     exit(1);
+    // }
 
     /* Repeatedly read data from socket and write to user.s screen. */
     char response[MAX_LENGTH];
@@ -121,10 +129,101 @@ char *argv[];
         fprintf(stderr, "error receiving response\n");
         exit(1);
     }
-    printf("%s", response);
-   
-    /* Close the socket. */
-    closesocket(sd);
-    /* Terminate the client program gracefully. */
-    exit(0);
+
+    printf("%s\n", response);
+    
+    int choice;
+
+    while (1) {
+        printf("Please select an action:\n");
+        printf("1. Show all files in the server\n");
+        printf("2. Download file from server with name\n");
+        printf("3. Upload file to server\n");
+        printf("4. Delete file from the server with name\n");
+        printf("5. Rename the file in server\n");
+        printf("6. Exit\n");
+        printf("Enter your choice (1-6): ");
+
+        if (scanf("%d", &choice) != 1) {
+            // Clear input buffer if non-integer input is entered
+            while (getchar() != '\n');
+            printf("Invalid choice!\n");
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                show_file_names();
+                break;
+            case 2:
+                download_file();
+                break;
+            case 3:
+                upload_file();
+                break;
+            case 4:
+                delete_file();
+                break;
+            case 5:
+                rename_file();
+                break;
+
+            case 6:
+                /* Close the socket. */
+                closesocket(sd);
+                /* Terminate the client program gracefully. */
+                exit(0);
+            default:
+                printf("Invalid choice!\n");
+        }
+    }
+}
+
+void show_file_names() {
+    // Code to show all the files in the server
+    printf("Showing all files in the server...\n");
+}
+
+void download_file() {
+    char filename[MAX_LENGTH];
+
+    printf("Enter the filename to download: ");
+    scanf("%s", filename);
+
+    // Code to download the file from the server
+    printf("Downloading file '%s' from server...\n", filename);
+}
+
+void upload_file() {
+    char filename[MAX_LENGTH];
+
+    printf("Enter the filename to upload: ");
+    scanf("%s", filename);
+
+    // Code to upload the file to the server
+    printf("Uploading file '%s' to server...\n", filename);
+}
+
+void delete_file() {
+    char filename[MAX_LENGTH];
+
+    printf("Enter the filename to delete: ");
+    scanf("%s", filename);
+
+    // Code to delete the file from the server
+    printf("Deleting file '%s' from server...\n", filename);
+}
+
+void rename_file() {
+    char old_filename[MAX_LENGTH];
+    char new_filename[MAX_LENGTH];
+
+    printf("Enter the old filename: ");
+    scanf("%s", old_filename);
+
+    printf("Enter the new filename: ");
+    scanf("%s", new_filename);
+
+    // Code to rename the file in the server
+    printf("Renaming file '%s' to '%s'...\n", old_filename, new_filename);
 }
