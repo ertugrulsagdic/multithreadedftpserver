@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <dirent.h>
 #define MAX_CLIENTS 10   /* maximum number of clients */
 #define BUFFER_SIZE 1024 /* size of buffer for string the server sends */
 #define PROTOPORT 5193   /* default protocol port number */
@@ -20,6 +21,12 @@
 int visits = 0;          /* counts client connections */
 
 void *handle_client(void *arg);
+
+void show_file_names(int client_fd);
+void upload_file(int client_fd);
+void download_file(int client_fd);
+void delete_file(int client_fd);
+void rename_file(int client_fd);
 
 /*------------------------------------------------------------------------
  * * Program: server
@@ -139,6 +146,30 @@ void *handle_client(void *arg)
     {
         printf("Client %d sent: %s\n", client_fd, buffer);
 
+        int choice = atoi(buffer);
+
+        switch (choice)
+        {
+        case 1:
+            show_file_names(client_fd);
+            break;
+        case 2:
+            download_file(client_fd);
+            break;
+        case 3:
+            upload_file(client_fd);
+            break;
+        case 4:
+            delete_file(client_fd);
+            break;
+        case 5:
+            rename_file(client_fd);
+            break;
+            exit(0);
+        default:
+            printf("Invalid choice!\n");
+        }
+
         memset(buffer, 0, BUFFER_SIZE);
     }
 
@@ -146,4 +177,219 @@ void *handle_client(void *arg)
 
     closesocket(client_fd);
     pthread_exit(NULL);
+}
+
+void show_file_names(int client_fd)
+{
+    // Get all file names in the current directory
+    DIR *d;
+    struct dirent *dir;
+    d = opendir("./server_files");
+    int count = 0;
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            char *filename = dir->d_name;
+            if (strcmp(filename, ".") == 0 || strcmp(filename, "..") == 0)
+                continue;
+            send(client_fd, filename, strlen(filename), 0);
+            send(client_fd, "\n", 1, 0);
+            count++;
+        }
+        closedir(d);
+    }
+    printf("Total files: %d\n", count);
+    if (count == 0)
+    {
+        char *msg = "No files found in server\n";
+        send(client_fd, msg, strlen(msg), 0);
+    }
+
+    send(client_fd, "EOF\n", 4, 0);
+}
+
+void download_file(int client_fd)
+{
+    // read filename from client
+    char buffer[BUFFER_SIZE];
+    int valread = read(client_fd, buffer, BUFFER_SIZE);
+    if (valread < 0)
+    {
+        printf("Error reading from client\n");
+        return;
+    }
+
+    char *filename = buffer;
+
+    printf("Filename to download: %s\n", filename);
+
+    char filepath[BUFFER_SIZE];
+    snprintf(filepath, BUFFER_SIZE, "%s/%s", "server_files", filename); // create the full file path
+    FILE *file = fopen(filepath, "rb");                                 // open the file in binary mode
+    if (file == NULL)
+    {
+        // send an error message to the client if the file doesn't exist
+        char *error_msg = "ERROR: File not found\n";
+        send(client_fd, error_msg, strlen(error_msg), 0);
+    }
+    else
+    {
+        // read the file and send its contents to the client
+        char buffer[BUFFER_SIZE];
+        size_t bytes_read;
+        //  Buraya dikkat buyuk boyuttaki file gonderirken farkli calisiyor
+        while ((bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, file)) > 0)
+        {
+            send(client_fd, buffer, bytes_read, 0);
+        }
+        fclose(file);
+    }
+
+    memset(filepath, 0, BUFFER_SIZE);
+    memset(buffer, 0, BUFFER_SIZE);
+}
+
+void upload_file(int client_fd)
+{
+
+    // read filename from client
+    char buffer[BUFFER_SIZE];
+    int valread = read(client_fd, buffer, BUFFER_SIZE);
+    if (valread < 0)
+    {
+        printf("Error reading from client\n");
+        return;
+    }
+
+    char *filename = buffer;
+
+    char response[BUFFER_SIZE] = {0};
+
+    int n = recv(client_fd, response, BUFFER_SIZE, 0);
+    if (n < 0)
+    {
+        fprintf(stderr, "error receiving response\n");
+        exit(1);
+    }
+
+    if (strcmp(response, "ERROR: File not found\n") == 0)
+    {
+        printf("%s\n", response);
+        return;
+    }
+    else
+    {
+        char filepath[BUFFER_SIZE];
+        snprintf(filepath, BUFFER_SIZE, "%s/%s", "client_files", filename);
+        // create file
+        FILE *fp;
+        fp = fopen(filepath, "w");
+        memset(filepath, '\0', strlen(filepath));
+
+        if (fp == NULL)
+        {
+            printf("ERROR: File not created!\n\n");
+            return;
+        }
+
+        // do while loop to receive file
+        do
+        {
+            fprintf(fp, "%s", response);
+            bzero(response, BUFFER_SIZE);
+            if (n < BUFFER_SIZE)
+            {
+                printf("File downloaded successfully!\n\n");
+                break;
+            }
+        } while ((n = recv(client_fd, response, BUFFER_SIZE, 0)) > 0);
+
+        fclose(fp);
+    }
+
+    memset(filename, 0, BUFFER_SIZE);
+}
+
+void delete_file(int client_fd)
+{
+    // read filename from client
+    char buffer[BUFFER_SIZE];
+    int valread = read(client_fd, buffer, BUFFER_SIZE);
+    if (valread < 0)
+    {
+        printf("Error reading from client\n");
+        return;
+    }
+
+    char *filename = buffer;
+
+    printf("Filename: %s\n", filename);
+
+    char filepath[BUFFER_SIZE];
+    snprintf(filepath, BUFFER_SIZE, "%s/%s", "server_files", filename);
+
+    if (remove(filepath) == 0)
+    {
+        printf("File deleted successfully\n");
+        char *success_msg = "SUCCESS: File deleted\r\n";
+        send(client_fd, success_msg, strlen(success_msg), 0);
+    }
+    else
+    {
+        printf("Unable to delete file\n");
+        char *error_msg = "ERROR: File not deleted\r\n";
+        send(client_fd, error_msg, strlen(error_msg), 0);
+    }
+
+    memset(filepath, 0, BUFFER_SIZE);
+    memset(buffer, 0, BUFFER_SIZE);
+}
+
+void rename_file(int client_fd)
+{
+    // read filename from client
+    char buffer[BUFFER_SIZE];
+    int valread = read(client_fd, buffer, BUFFER_SIZE);
+    if (valread < 0)
+    {
+        printf("Error reading from client\n");
+        return;
+    }
+
+    char *token = strtok(buffer, ":");
+    if (token == NULL)
+    {
+        printf("ERROR: Missing arguments!\n");
+        return;
+    }
+    char *filename = token;
+
+    token = strtok(NULL, ":");
+    char *newFileName = token;
+
+    printf("File Name: %s\n", filename);
+    printf("New File Name: %s\n", newFileName);
+
+    char oldFilePath[BUFFER_SIZE];
+    char newFilepath[BUFFER_SIZE];
+    snprintf(oldFilePath, BUFFER_SIZE, "%s/%s", "server_files", filename);
+    snprintf(newFilepath, BUFFER_SIZE, "%s/%s", "server_files", newFileName);
+
+    if (rename(oldFilePath, newFilepath) == 0)
+    {
+        printf("%s", "File name changed successfully");
+        char *success_msg = "SUCCESS: File name changed\r\n";
+        send(client_fd, success_msg, strlen(success_msg), 0);
+    }
+    else
+    {
+        printf("Unable to rename the file");
+        char *error_msg = "ERROR: File not renamed\r\n";
+        send(client_fd, error_msg, strlen(error_msg), 0);
+    }
+
+    memset(oldFilePath, 0, BUFFER_SIZE);
+    memset(newFilepath, 0, BUFFER_SIZE);
+    memset(buffer, 0, BUFFER_SIZE);
 }

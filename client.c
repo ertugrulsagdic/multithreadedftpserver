@@ -13,17 +13,16 @@
 #endif
 #include <stdio.h>
 #include <string.h>
-#define PROTOPORT 5193 /* default protocol port number */
+#define PROTOPORT 5193  /* default protocol port number */
 #define MAX_LENGTH 1024 /* maximum buffer size */
 extern int errno;
 char localhost[] = "localhost"; /* default host name */
 
-
-void show_file_names();
-void upload_file();
-void download_file();
-void delete_file();
-void rename_file();
+void show_file_names(int sd);
+void upload_file(int sd);
+void download_file(int sd);
+void delete_file(int sd);
+void rename_file(int sd);
 
 /*------------------------------------------------------------------------
  * * Program: client
@@ -112,29 +111,22 @@ char *argv[];
         exit(1);
     }
 
-    // // Send command to server
-    // char command[MAX_LENGTH];
-    // strcpy(command, argv[3]);
-    // ssize_t request = send(sd, command, strlen(command), 0);
-    // if (request < 0) {
-    //     fprintf(stderr, "error sending command\n");
-    //     exit(1);
-    // }
-
     /* Repeatedly read data from socket and write to user.s screen. */
     char response[MAX_LENGTH];
     memset(response, 0, MAX_LENGTH);
     n = recv(sd, response, MAX_LENGTH, 0);
-    if (n < 0) {
+    if (n < 0)
+    {
         fprintf(stderr, "error receiving response\n");
         exit(1);
     }
 
     printf("%s\n", response);
-    
+
     int choice;
 
-    while (1) {
+    while (1)
+    {
         printf("Please select an action:\n");
         printf("1. Show all files in the server\n");
         printf("2. Download file from server with name\n");
@@ -144,79 +136,251 @@ char *argv[];
         printf("6. Exit\n");
         printf("Enter your choice (1-6): ");
 
-        if (scanf("%d", &choice) != 1) {
+        if (scanf("%d", &choice) != 1)
+        {
             // Clear input buffer if non-integer input is entered
-            while (getchar() != '\n');
+            while (getchar() != '\n')
+                ;
             printf("Invalid choice!\n");
             continue;
         }
 
-        switch (choice) {
-            case 1:
-                show_file_names();
-                break;
-            case 2:
-                download_file();
-                break;
-            case 3:
-                upload_file();
-                break;
-            case 4:
-                delete_file();
-                break;
-            case 5:
-                rename_file();
-                break;
+        switch (choice)
+        {
+        case 1:
+            show_file_names(sd);
+            break;
+        case 2:
+            download_file(sd);
+            break;
+        case 3:
+            upload_file(sd);
+            break;
+        case 4:
+            delete_file(sd);
+            break;
+        case 5:
+            rename_file(sd);
+            break;
 
-            case 6:
-                /* Close the socket. */
-                closesocket(sd);
-                /* Terminate the client program gracefully. */
-                exit(0);
-            default:
-                printf("Invalid choice!\n");
+        case 6:
+            /* Close the socket. */
+            closesocket(sd);
+            /* Terminate the client program gracefully. */
+            exit(0);
+        default:
+            printf("Invalid choice!\n");
         }
     }
+
+    printf("Loop exited\n");
 }
 
-void show_file_names() {
+void show_file_names(int sd)
+{
     // Code to show all the files in the server
+    printf("\n");
     printf("Showing all files in the server...\n");
+
+    // Send command to server
+    char *command = "1";
+    ssize_t request = send(sd, command, strlen(command), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending command\n");
+        exit(1);
+    }
+
+    char response[MAX_LENGTH] = {0};
+
+    int valread;
+
+    while ((valread = recv(sd, response, MAX_LENGTH, 0)) > 0)
+    {
+        // Check for end-of-file message
+        if (strcmp(response, "EOF\n") == 0)
+        {
+            break;
+        }
+        printf("%s", response);
+        bzero(response, MAX_LENGTH);
+    }
+
+    printf("Done showing all files in the server\n");
+    printf("\n");
 }
 
-void download_file() {
+void download_file(int sd)
+{
+    printf("\n");
+    // Send command to server
+    char *command = "2";
+    ssize_t request = send(sd, command, strlen(command), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending command\n");
+        exit(1);
+    }
     char filename[MAX_LENGTH];
 
     printf("Enter the filename to download: ");
     scanf("%s", filename);
 
-    // Code to download the file from the server
-    printf("Downloading file '%s' from server...\n", filename);
+    // send filename to server
+    request = send(sd, filename, strlen(filename), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending filename\n");
+        exit(1);
+    }
+
+    char response[MAX_LENGTH] = {0};
+    int n = recv(sd, response, MAX_LENGTH, 0);
+    if (n < 0)
+    {
+        fprintf(stderr, "error receiving response\n");
+        exit(1);
+    }
+
+    if (strcmp(response, "ERROR: File not found\n") == 0)
+    {
+        printf("%s\n", response);
+        return;
+    }
+    else
+    {
+        char filepath[MAX_LENGTH];
+        snprintf(filepath, MAX_LENGTH, "%s/%s", "client_files", filename);
+        // create file
+        FILE *fp;
+        fp = fopen(filepath, "w");
+        memset(filepath, '\0', strlen(filepath));
+
+        if (fp == NULL)
+        {
+            printf("ERROR: File not created!\n\n");
+            return;
+        }
+
+        // do while loop to receive file
+        do
+        {
+            fprintf(fp, "%s", response);
+            bzero(response, MAX_LENGTH);
+            if (n < MAX_LENGTH)
+            {
+                printf("File downloaded successfully!\n\n");
+                break;
+            }
+        } while ((n = recv(sd, response, MAX_LENGTH, 0)) > 0);
+
+        fclose(fp);
+    }
+
+    memset(filename, 0, MAX_LENGTH);
 }
 
-void upload_file() {
+void upload_file(int sd)
+{
+    printf("\n");
+    // Send command to server
+    char *command = "2";
+    ssize_t request = send(sd, command, strlen(command), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending command\n");
+        exit(1);
+    }
     char filename[MAX_LENGTH];
 
-    printf("Enter the filename to upload: ");
+    printf("Enter the filename to download: ");
     scanf("%s", filename);
 
-    // Code to upload the file to the server
-    printf("Uploading file '%s' to server...\n", filename);
+    // send filename to server
+    request = send(sd, filename, strlen(filename), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending filename\n");
+        exit(1);
+    }
+
+    char filepath[MAX_LENGTH];
+    snprintf(filepath, MAX_LENGTH, "%s/%s", "client_files", filename); // create the full file path
+    FILE *file = fopen(filepath, "rb");                                // open the file in binary mode
+    if (file == NULL)
+    {
+        // send an error message to the client if the file doesn't exist
+        char *error_msg = "ERROR: File not found\n";
+        send(sd, error_msg, strlen(error_msg), 0);
+    }
+    else
+    {
+        // read the file and send its contents to the client
+        char buffer[MAX_LENGTH];
+        size_t bytes_read;
+        //  Buraya dikkat buyuk boyuttaki file gonderirken farkli calisiyor
+        while ((bytes_read = fread(buffer, sizeof(char), MAX_LENGTH, file)) > 0)
+        {
+            send(sd, buffer, bytes_read, 0);
+        }
+        fclose(file);
+    }
 }
 
-void delete_file() {
-    char filename[MAX_LENGTH];
+void delete_file(int sd)
+{
+    printf("\n");
+    // Send command to server
+    char *command = "4";
+    ssize_t request = send(sd, command, strlen(command), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending command\n");
+        exit(1);
+    }
 
+    char filename[MAX_LENGTH];
     printf("Enter the filename to delete: ");
     scanf("%s", filename);
 
+    // send filename to server
+    request = send(sd, filename, strlen(filename), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending filename\n");
+        exit(1);
+    }
+
     // Code to delete the file from the server
     printf("Deleting file '%s' from server...\n", filename);
+
+    char response[MAX_LENGTH];
+    int n = recv(sd, response, MAX_LENGTH, 0);
+    if (n < 0)
+    {
+        fprintf(stderr, "error receiving response\n");
+        exit(1);
+    }
+    printf("Server response: %s\n", response);
+
+    memset(filename, 0, MAX_LENGTH);
 }
 
-void rename_file() {
+void rename_file(int sd)
+{
     char old_filename[MAX_LENGTH];
     char new_filename[MAX_LENGTH];
+    char filenames[MAX_LENGTH];
+
+    printf("\n");
+    // Send command to server
+    char *command = "5";
+    ssize_t request = send(sd, command, strlen(command), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending command\n");
+        exit(1);
+    }
 
     printf("Enter the old filename: ");
     scanf("%s", old_filename);
@@ -224,6 +388,31 @@ void rename_file() {
     printf("Enter the new filename: ");
     scanf("%s", new_filename);
 
+    strcpy(filenames, old_filename);
+    strcat(filenames, ":");
+    strcat(filenames, new_filename);
+
+    // send filenames to server
+    request = send(sd, filenames, strlen(filenames), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending filename\n");
+        exit(1);
+    }
+
     // Code to rename the file in the server
     printf("Renaming file '%s' to '%s'...\n", old_filename, new_filename);
+
+    char response[MAX_LENGTH];
+    int n = recv(sd, response, MAX_LENGTH, 0);
+    if (n < 0)
+    {
+        fprintf(stderr, "error receiving response\n");
+        exit(1);
+    }
+    printf("Server response: %s\n", response);
+
+    memset(old_filename, 0, MAX_LENGTH);
+    memset(new_filename, 0, MAX_LENGTH);
+    memset(filenames, 0, MAX_LENGTH);
 }
