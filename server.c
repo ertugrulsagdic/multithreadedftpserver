@@ -416,13 +416,13 @@ void rename_file(int client_fd)
 
     if (rename(oldFilePath, newFilepath) == 0)
     {
-        printf("%s", "File name changed successfully");
+        printf("%s", "File name changed successfully\n");
         char *success_msg = "SUCCESS: File name changed\r\n";
         send(client_fd, success_msg, strlen(success_msg), 0);
     }
     else
     {
-        printf("Unable to rename the file");
+        printf("Unable to rename the file\n");
         char *error_msg = "ERROR: File not renamed\r\n";
         send(client_fd, error_msg, strlen(error_msg), 0);
     }
