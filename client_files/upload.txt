@@ -16,4 +16,4 @@ Each paragraph is separated by a blank line, which makes it easier to read and u
 
 You can also see that the text uses standard punctuation and grammar rules to make it clear and concise.
 
-Overall, text files are an important part of computer systems and are used for a variety of purposes. Whether you are storing configuration settings, logging system events, or keeping track of data, text files provide a simple and efficient way to store and access information. 
+Overall, text files are an important part of computer systems and are used for a variety of purposes. Whether you are storing configuration settings, logging system events, or keeping track of data, text files provide a simple and efficient way to store and access information.

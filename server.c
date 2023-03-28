@@ -48,6 +48,25 @@ void rename_file(int client_fd);
 main(argc, argv) int argc;
 char *argv[];
 {
+    // remove all files in the server directory except the download.txt file
+    DIR *server_dir;
+    struct dirent *dir;
+    server_dir = opendir("./server_files");
+    if (server_dir)
+    {
+        while ((dir = readdir(server_dir)) != NULL)
+        {
+            if (strcmp(dir->d_name, "download.txt") != 0)
+            {
+                char filepath[BUFFER_SIZE];
+                snprintf(filepath, BUFFER_SIZE, "%s/%s", "server_files", dir->d_name);
+                remove(filepath);
+                bzero(filepath, BUFFER_SIZE);
+            }
+        }
+        closedir(server_dir);
+    }
+
     struct hostent *ptrh;   /* pointer to a host table entry */
     struct protoent *ptrp;  /* pointer to a protocol table entry */
     struct sockaddr_in sad; /* structure to hold server.s address */
@@ -206,7 +225,9 @@ void show_file_names(int client_fd)
         send(client_fd, msg, strlen(msg), 0);
     }
 
-    send(client_fd, "EOF\n", 4, 0);
+    char *ack = "END";
+    send(client_fd, ack, strlen(ack), 0);
+    printf("File names sent to client %d\n", client_fd);
 }
 
 void download_file(int client_fd)
@@ -253,19 +274,28 @@ void download_file(int client_fd)
 void upload_file(int client_fd)
 {
 
-    // read filename from client
-    char buffer[BUFFER_SIZE];
-    int valread = read(client_fd, buffer, BUFFER_SIZE);
-    if (valread < 0)
+    char filename[BUFFER_SIZE] = {0};
+
+    int msg = recv(client_fd, filename, BUFFER_SIZE, 0);
+    if (msg < 0)
     {
-        printf("Error reading from client\n");
+        fprintf(stderr, "error receiving response\n");
         return;
     }
 
-    char *filename = buffer;
+    // check if filename is "ERROR: File not found\r\n"
+    if (strcmp(filename, "ERROR: File not found\r\n") == 0)
+    {
+        return;
+    }
+
+    printf("Filename to upload: %s\n", filename);
+        printf("len: %d\n", strlen(filename));
+
+    // send ack to client
+    send(client_fd, filename, strlen(filename), 0);
 
     char response[BUFFER_SIZE] = {0};
-
     int n = recv(client_fd, response, BUFFER_SIZE, 0);
     if (n < 0)
     {
@@ -273,26 +303,33 @@ void upload_file(int client_fd)
         exit(1);
     }
 
-    if (strcmp(response, "ERROR: File not found\n") == 0)
+    if (strcmp(response, "ERROR: Filename not received\r\n") == 0)
     {
-        printf("%s\n", response);
+        printf("Filename not received\n");
         return;
     }
     else
     {
+        
         char filepath[BUFFER_SIZE];
-        snprintf(filepath, BUFFER_SIZE, "%s/%s", "client_files", filename);
+        snprintf(filepath, BUFFER_SIZE, "%s/%s", "server_files", filename);
         // create file
+
+        printf("Filepath: %s\n", filepath);
+
+
         FILE *fp;
         fp = fopen(filepath, "w");
-        memset(filepath, '\0', strlen(filepath));
 
         if (fp == NULL)
         {
-            printf("ERROR: File not created!\n\n");
+            char *error_msg = "ERROR: something went wrong while creating file on server side\n";
+            send(client_fd, error_msg, strlen(error_msg), 0);
             return;
         }
 
+        memset(filepath, '\0', strlen(filepath));
+        
         // do while loop to receive file
         do
         {
@@ -300,7 +337,8 @@ void upload_file(int client_fd)
             bzero(response, BUFFER_SIZE);
             if (n < BUFFER_SIZE)
             {
-                printf("File downloaded successfully!\n\n");
+                char *success_msg = "File uploaded successfully!\n";
+                send(client_fd, success_msg, strlen(success_msg), 0);
                 break;
             }
         } while ((n = recv(client_fd, response, BUFFER_SIZE, 0)) > 0);
@@ -308,7 +346,7 @@ void upload_file(int client_fd)
         fclose(fp);
     }
 
-    memset(filename, 0, BUFFER_SIZE);
+    memset(response, 0, BUFFER_SIZE);
 }
 
 void delete_file(int client_fd)
