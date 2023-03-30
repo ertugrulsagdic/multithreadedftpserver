@@ -64,7 +64,6 @@ char *argv[];
         closedir(client_dir);
     }
 
-
     struct hostent *ptrh;   /* pointer to a host table entry */
     struct protoent *ptrp;  /* pointer to a protocol table entry */
     struct sockaddr_in sad; /* structure to hold an IP address */
@@ -203,7 +202,8 @@ char *argv[];
     printf("Loop exited\n");
 }
 
-void show_file_names_client(){
+void show_file_names_client()
+{
     printf("\n");
     // Get all file names in the current directory
     DIR *d;
@@ -229,7 +229,6 @@ void show_file_names_client(){
 void show_file_names(int sd)
 {
     // Code to show all the files in the server
-    printf("\n");
     printf("Showing all files in the server...\n");
 
     // Send command to server
@@ -310,6 +309,7 @@ void show_file_names(int sd)
 void download_file(int sd)
 {
     printf("\n");
+    show_file_names(sd);
     // Send command to server
     char *command = "2";
     ssize_t request = send(sd, command, strlen(command), 0);
@@ -379,7 +379,8 @@ void download_file(int sd)
 
 void upload_file(int sd)
 {
-    printf("\n");
+    printf("\nUploadable Files:");
+    show_file_names_client();
     // Send command to server
     char *command = "3";
     ssize_t request = send(sd, command, strlen(command), 0);
@@ -423,11 +424,6 @@ void upload_file(int sd)
             return;
         }
 
-        printf("response: %s\n", response);
-        printf("filename: %s\n", filename);
-        printf("len: %d\n", strlen(filename));
-        printf("len response: %d\n", strlen(response));
-        
         if (strcmp(response, filename) == 0)
         {
             // read the file and send its contents to the client
@@ -439,17 +435,17 @@ void upload_file(int sd)
                 send(sd, buffer, bytes_read, 0);
             }
             fclose(file);
-        
+
             bzero(buffer, MAX_LENGTH);
-        } else {
+        }
+        else
+        {
             char *error_msg = "ERROR: Filename not received\r\n";
             printf("%s\n", error_msg);
             send(sd, error_msg, strlen(error_msg), 0);
             return;
         }
-        
     }
-
 
     // receive a message from the server to indicate that the file has been uploaded
     char response[MAX_LENGTH];
@@ -465,6 +461,8 @@ void upload_file(int sd)
 void delete_file(int sd)
 {
     printf("\n");
+    show_file_names(sd);
+
     // Send command to server
     char *command = "4";
     ssize_t request = send(sd, command, strlen(command), 0);
@@ -503,6 +501,9 @@ void delete_file(int sd)
 
 void rename_file(int sd)
 {
+    printf("\n");
+    show_file_names(sd);
+
     char old_filename[MAX_LENGTH];
     char new_filename[MAX_LENGTH];
     char filenames[MAX_LENGTH];
