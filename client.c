@@ -243,19 +243,65 @@ void show_file_names(int sd)
 
     char response[MAX_LENGTH] = {0};
 
-    int valread;
-    
-    char *ack = "END";
-
-    while ((valread = recv(sd, response, MAX_LENGTH, 0)) > 0)
-    {   
-        if (strcmp(response, ack) == 0)
-        {
-            break;
-        }
-        printf("%s", response);
-        bzero(response, MAX_LENGTH);
+    // receive the number of files
+    int valread = recv(sd, &response, sizeof(response), 0);
+    if (valread < 0)
+    {
+        fprintf(stderr, "error receiving number of files\n");
+        exit(1);
     }
+
+    int count = atoi(response);
+
+    // send the count back as ack
+    request = send(sd, &response, strlen(response), 0);
+    if (request < 0)
+    {
+        fprintf(stderr, "error sending ack\n");
+        exit(1);
+    }
+    
+    if (count == 0)
+    {
+        char *error = "No files found in server\n";
+        printf("%s", error);
+    } else {
+        // check response if there is a string after the \0
+        // if (token != NULL)
+        // {
+        //     printf("%s", token);
+        // }
+
+        // recieve the file names to the client
+        for (int i = 0; i < count; i++)
+        {
+
+
+            // receive the file name
+            int filenames = recv(sd, response, MAX_LENGTH, 0);
+            if (valread < 0)
+            {
+                fprintf(stderr, "error receiving file name\n");
+                exit(1);
+            }
+            printf("%s\n", response);
+            bzero(response, MAX_LENGTH);
+        }
+        
+
+        printf("Total files: %d\n", count);
+    }
+
+
+    // while ((valread = recv(sd, response, MAX_LENGTH, 0)) > 0)
+    // {   
+    //     if (strcmp(response, ack) == 0)
+    //     {
+    //         break;
+    //     }
+    //     printf("%s", response);
+    //     bzero(response, MAX_LENGTH);
+    // }
 
     printf("Done showing all files in the server\n");
     printf("\n");

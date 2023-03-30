@@ -205,6 +205,7 @@ void show_file_names(int client_fd)
     struct dirent *dir;
     d = opendir("./server_files");
     int count = 0;
+    char **filenames = NULL;
     if (d)
     {
         while ((dir = readdir(d)) != NULL)
@@ -212,21 +213,47 @@ void show_file_names(int client_fd)
             char *filename = dir->d_name;
             if (strcmp(filename, ".") == 0 || strcmp(filename, "..") == 0)
                 continue;
-            send(client_fd, filename, strlen(filename), 0);
-            send(client_fd, "\n", 1, 0);
+            // add filename to filenames array
+            filenames = (char **)realloc(filenames, sizeof(char *) * (count + 1));
+            filenames[count] = (char *)malloc(sizeof(char) * (strlen(filename) + 1));
+            strcpy(filenames[count], filename);
             count++;
         }
         closedir(d);
     }
     printf("Total files: %d\n", count);
-    if (count == 0)
+    
+    // send the number of files to the client
+    // convert count to string
+    char buffer[BUFFER_SIZE] = {0};
+    sprintf(buffer, "%d", count);
+    send(client_fd, buffer, strlen(buffer), 0);
+    // receive ack from client
+    char ack[BUFFER_SIZE] = {0};
+    int valread = read(client_fd, ack, BUFFER_SIZE);
+    if (valread < 0)
     {
-        char *msg = "No files found in server\n";
-        send(client_fd, msg, strlen(msg), 0);
+        printf("Error reading from client\n");
+        return;
+    }
+    
+    if (strcmp(ack, buffer) != 0)
+    {
+        printf("Error receiving ack from client\n");
+        return;
     }
 
-    char *ack = "END";
-    send(client_fd, ack, strlen(ack), 0);
+    if (count > 0)
+    {
+        // send the file names to the client
+        for (int i = 0; i < count; i++)
+        {
+            send(client_fd, filenames[i], strlen(filenames[i]), 0);
+        }
+    }
+
+    // char *ack = "END";
+    // send(client_fd, ack, strlen(ack), 0);
     printf("File names sent to client %d\n", client_fd);
 }
 
